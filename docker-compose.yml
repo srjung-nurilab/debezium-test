@@ -1,0 +1,89 @@
+services:
+  mongo1:
+    image: mongo:7.0.8
+    container_name: mongo1
+    hostname: mongo1
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo1-data:/data/db
+      - mongo1-config:/data/configdb
+    networks:
+      - cdc
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --host localhost:27017 --eval 'db.adminCommand({ ping: 1 }).ok' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  mongo2:
+    image: mongo:7.0.8
+    container_name: mongo2
+    hostname: mongo2
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo2-data:/data/db
+      - mongo2-config:/data/configdb
+    networks:
+      - cdc
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --host localhost:27017 --eval 'db.adminCommand({ ping: 1 }).ok' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  mongo3:
+    image: mongo:7.0.8
+    container_name: mongo3
+    hostname: mongo3
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongo3-data:/data/db
+      - mongo3-config:/data/configdb
+    networks:
+      - cdc
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --host localhost:27017 --eval 'db.adminCommand({ ping: 1 }).ok' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  mongo-init:
+    image: mongo:7.0.8
+    container_name: mongo-init
+    depends_on:
+      mongo1:
+        condition: service_healthy
+      mongo2:
+        condition: service_healthy
+      mongo3:
+        condition: service_healthy
+    volumes:
+      - ./scripts/mongo-init.js:/scripts/mongo-init.js:ro
+    networks:
+      - cdc
+    entrypoint: ["mongosh", "--host", "mongo1:27017", "/scripts/mongo-init.js"]
+    restart: "no"
+
+networks:
+  cdc:
+    name: cdc
+
+volumes:
+  mongo1-data:
+  mongo1-config:
+  mongo2-data:
+  mongo2-config:
+  mongo3-data:
+  mongo3-config:
