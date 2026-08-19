@@ -1,6 +1,6 @@
 # MongoDB CDC 개발 클러스터
 
-MongoDB 7.0.8 replica set(`rs0`)과 NATS 3개 노드 클러스터(`nats`)를 Docker Compose로 구성합니다. NATS는 CDC 메시지의 안정적인 보관을 위해 JetStream을 활성화합니다.
+MongoDB 7.0.8 replica set(`rs0`), NATS 3개 노드 클러스터(`nats`), PostgreSQL 18을 Docker Compose로 구성합니다. NATS는 CDC 메시지의 안정적인 보관을 위해 JetStream을 활성화합니다.
 
 ## 시작
 
@@ -9,7 +9,17 @@ docker compose up -d
 docker compose ps
 ```
 
-`mongo-init`이 종료되고 `mongo1`, `mongo2`, `mongo3`, `nats1`, `nats2`, `nats3`가 `healthy`이면 초기화가 끝난 상태입니다.
+`mongo-init`이 종료되고 `mongo1`, `mongo2`, `mongo3`, `nats1`, `nats2`, `nats3`, `postgres`가 `healthy`이면 초기화가 끝난 상태입니다.
+
+## PostgreSQL 접속
+
+개발용 PostgreSQL 접속 정보는 다음과 같습니다.
+
+```text
+postgresql://postgres:postgres@localhost:5432/app
+```
+
+Docker 네트워크 내부에서는 `postgres:5432`로 접속합니다. logical replication을 위해 `wal_level=logical`, `max_replication_slots=10`, `max_wal_senders=10`을 설정했습니다.
 
 ## NATS 접속
 

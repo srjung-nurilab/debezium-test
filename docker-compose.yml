@@ -139,6 +139,37 @@ services:
       retries: 20
       start_period: 5s
 
+  postgres:
+    image: postgres:18-alpine
+    container_name: postgres
+    hostname: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+      PGDATA: /var/lib/postgresql/18/docker
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - cdc
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
 networks:
   cdc:
     name: cdc
@@ -153,3 +184,4 @@ volumes:
   nats1-data:
   nats2-data:
   nats3-data:
+  postgres-data:
