@@ -76,6 +76,69 @@ services:
     entrypoint: ["mongosh", "--host", "mongo1:27017", "/scripts/mongo-init.js"]
     restart: "no"
 
+  nats1:
+    image: nats:2.14.2-alpine
+    container_name: nats1
+    hostname: nats1
+    restart: unless-stopped
+    command: ["--config", "/etc/nats/nats.conf"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats1-data:/data
+      - ./nats/nats1.conf:/etc/nats/nats.conf:ro
+    networks:
+      - cdc
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  nats2:
+    image: nats:2.14.2-alpine
+    container_name: nats2
+    hostname: nats2
+    restart: unless-stopped
+    command: ["--config", "/etc/nats/nats.conf"]
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+    volumes:
+      - nats2-data:/data
+      - ./nats/nats2.conf:/etc/nats/nats.conf:ro
+    networks:
+      - cdc
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  nats3:
+    image: nats:2.14.2-alpine
+    container_name: nats3
+    hostname: nats3
+    restart: unless-stopped
+    command: ["--config", "/etc/nats/nats.conf"]
+    ports:
+      - "4224:4222"
+      - "8224:8222"
+    volumes:
+      - nats3-data:/data
+      - ./nats/nats3.conf:/etc/nats/nats.conf:ro
+    networks:
+      - cdc
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
 networks:
   cdc:
     name: cdc
@@ -87,3 +150,6 @@ volumes:
   mongo2-config:
   mongo3-data:
   mongo3-config:
+  nats1-data:
+  nats2-data:
+  nats3-data:

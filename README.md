@@ -1,6 +1,6 @@
 # MongoDB CDC 개발 클러스터
 
-MongoDB 7.0.8과 Debezium MongoDB connector가 읽을 수 있도록 3개 노드 replica set(`rs0`)을 Docker Compose로 구성합니다.
+MongoDB 7.0.8 replica set(`rs0`)과 NATS 3개 노드 클러스터(`nats`)를 Docker Compose로 구성합니다. NATS는 CDC 메시지의 안정적인 보관을 위해 JetStream을 활성화합니다.
 
 ## 시작
 
@@ -9,7 +9,34 @@ docker compose up -d
 docker compose ps
 ```
 
-`mongo-init`이 종료되고 `mongo1`, `mongo2`, `mongo3`가 `healthy`이면 초기화가 끝난 상태입니다.
+`mongo-init`이 종료되고 `mongo1`, `mongo2`, `mongo3`, `nats1`, `nats2`, `nats3`가 `healthy`이면 초기화가 끝난 상태입니다.
+
+## NATS 접속
+
+`cdc` Docker 네트워크 내부의 Debezium/NATS 클라이언트에서는 다음 서버 목록을 사용합니다.
+
+```text
+nats://nats1:4222,nats://nats2:4222,nats://nats3:4222
+```
+
+호스트에서는 다음 포트로 접속할 수 있습니다.
+
+| 노드 | Client | Monitoring |
+| --- | ---: | ---: |
+| `nats1` | `4222` | `8222` |
+| `nats2` | `4223` | `8223` |
+| `nats3` | `4224` | `8224` |
+
+NATS 클러스터 route 포트(`6222`)는 Docker 내부 네트워크에서만 사용합니다.
+
+노드별 NATS 설정은 [nats/nats1.conf](/home/srjung/debezium-test/nats/nats1.conf), [nats/nats2.conf](/home/srjung/debezium-test/nats/nats2.conf), [nats/nats3.conf](/home/srjung/debezium-test/nats/nats3.conf)에 두었고, 각 컨테이너에 읽기 전용으로 mount합니다.
+
+클러스터 상태는 다음처럼 확인합니다.
+
+```bash
+curl http://localhost:8222/routez
+curl http://localhost:8222/jsz
+```
 
 ## 접속
 
