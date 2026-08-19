@@ -19,7 +19,7 @@ docker compose ps
 go run ./cmd/api
 ```
 
-호스트에서 실행할 때 기본 MongoDB URI는 `mongodb://localhost:27017/?directConnection=true`, database는 `app`입니다. 다른 값을 사용하려면 `MONGODB_URI`, `MONGODB_DATABASE` 환경 변수를 설정합니다.
+API를 Docker Compose 서비스로 추가하기 전에는 MongoDB host 포트를 노출하지 않습니다. API 컨테이너에서는 `MONGODB_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0`, `MONGODB_DATABASE=app`을 사용합니다.
 
 기본 포트는 `8080`이며, 주문 endpoint는 `POST|GET /orders`, `GET|PUT|DELETE /orders/:id`입니다. 모든 쓰기 요청에는 `Idempotency-Key` header가 필요합니다.
 
@@ -29,31 +29,19 @@ go test ./...
 
 ## PostgreSQL 접속
 
-개발용 PostgreSQL 접속 정보는 다음과 같습니다.
-
-```text
-postgresql://postgres:postgres@localhost:5432/app
-```
-
-Docker 네트워크 내부에서는 `postgres:5432`로 접속합니다. logical replication을 위해 `wal_level=logical`, `max_replication_slots=10`, `max_wal_senders=10`을 설정했습니다.
+PostgreSQL은 Docker 네트워크 내부에서만 `postgres:5432`로 접속합니다. logical replication을 위해 `wal_level=logical`, `max_replication_slots=10`, `max_wal_senders=10`을 설정했습니다.
 
 ## NATS 접속
 
-`cdc` Docker 네트워크 내부의 Debezium/NATS 클라이언트에서는 다음 서버 목록을 사용합니다.
+`cdc` Docker 네트워크 내부에서 애플리케이션 계정으로 접속할 때는 다음 서버 목록을 사용합니다.
 
 ```text
-nats://nats1:4222,nats://nats2:4222,nats://nats3:4222
+nats://app:app-password@nats1:4222,nats://app:app-password@nats2:4222,nats://app:app-password@nats3:4222
 ```
 
-호스트에서는 다음 포트로 접속할 수 있습니다.
+NATS client, monitoring, cluster route 포트(`4222`, `8222`, `6222`)는 모두 Docker 내부 네트워크 전용입니다. 상태 조회는 `nats-box` 컨테이너에서 수행합니다.
 
-| 노드 | Client | Monitoring |
-| --- | ---: | ---: |
-| `nats1` | `4222` | `8222` |
-| `nats2` | `4223` | `8223` |
-| `nats3` | `4224` | `8224` |
-
-NATS 클러스터 route 포트(`6222`)는 Docker 내부 네트워크에서만 사용합니다.
+NATS 계정은 역할별로 분리했습니다. `SYS` 계정(`sys` / `sys-password`)은 서버 모니터링 요청에만 사용하고, `APP` 계정(`app` / `app-password`)은 Debezium과 CDC applier가 JetStream stream 및 CDC subject를 사용합니다. 현재 값은 로컬 개발 전용이므로 운영 환경에서는 NKey 또는 credentials 파일과 secret 관리로 교체해야 합니다.
 
 ## Debezium CDC
 
@@ -68,10 +56,10 @@ MongoDB connector의 value는 Debezium envelope JSON이며, `after`와 `before` 
 상태와 수신 메시지는 다음처럼 확인합니다.
 
 ```bash
-docker compose exec nats-box nats --server nats://nats1:4222 server report jetstream
-docker compose exec nats-box nats --server nats://nats1:4222 stream add --config /config/mongo-cdc.json
+docker compose exec nats-box nats --server nats://sys:sys-password@nats1:4222 server report jetstream
+docker compose exec nats-box nats --server nats://app:app-password@nats1:4222 stream add --config /config/mongo-cdc.json
 docker compose logs -f debezium
-docker compose exec nats-box nats --server nats://nats1:4222 stream info MONGO_CDC
+docker compose exec nats-box nats --server nats://app:app-password@nats1:4222 stream info MONGO_CDC
 ```
 
 노드별 NATS 설정은 [nats/nats1.conf](/home/srjung/debezium-test/nats/nats1.conf), [nats/nats2.conf](/home/srjung/debezium-test/nats/nats2.conf), [nats/nats3.conf](/home/srjung/debezium-test/nats/nats3.conf)에 두었고, 각 컨테이너에 읽기 전용으로 mount합니다.
@@ -91,13 +79,7 @@ Debezium처럼 `cdc` Docker 네트워크에 연결된 클라이언트에서는 �
 mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
 ```
 
-호스트에서 단일 노드에 직접 접속해 데이터를 확인할 때는 다음처럼 사용합니다.
-
-```text
-mongosh "mongodb://localhost:27017/?directConnection=true"
-```
-
-각 노드는 호스트의 `27017`, `27018`, `27019` 포트로 노출되어 있습니다. replica set discovery를 사용하는 외부 클라이언트는 Docker 내부 DNS를 해석할 수 있어야 하므로, 그런 클라이언트는 우선 `cdc` 네트워크에 연결하는 방식으로 구성합니다.
+MongoDB의 모든 포트도 Docker 내부 전용입니다. replica set discovery를 사용하는 API와 CDC 컴포넌트는 `cdc` 네트워크에서 실행해야 합니다.
 
 현재는 로컬 CDC 개발을 위해 MongoDB 인증을 비활성화했습니다. 운영 또는 공유 환경에서는 keyfile 인증과 별도 CDC 사용자를 추가해야 합니다.
 
