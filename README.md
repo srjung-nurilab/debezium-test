@@ -11,6 +11,22 @@ docker compose ps
 
 `mongo-init`이 종료되고 `mongo1`, `mongo2`, `mongo3`, `nats1`, `nats2`, `nats3`, `postgres`가 `healthy`이면 초기화가 끝난 상태입니다.
 
+## Gin API controller
+
+주문 CRUD는 MongoDB repository를 사용합니다. API를 실행하기 전에 MongoDB Compose 서비스를 먼저 기동해야 합니다. migration state API는 다음 단계에서 PostgreSQL metadata table로 교체하기 전까지 in-memory service를 사용합니다.
+
+```bash
+go run ./cmd/api
+```
+
+호스트에서 실행할 때 기본 MongoDB URI는 `mongodb://localhost:27017/?directConnection=true`, database는 `app`입니다. 다른 값을 사용하려면 `MONGODB_URI`, `MONGODB_DATABASE` 환경 변수를 설정합니다.
+
+기본 포트는 `8080`이며, 주문 endpoint는 `POST|GET /orders`, `GET|PUT|DELETE /orders/:id`입니다. 모든 쓰기 요청에는 `Idempotency-Key` header가 필요합니다.
+
+```bash
+go test ./...
+```
+
 ## PostgreSQL 접속
 
 개발용 PostgreSQL 접속 정보는 다음과 같습니다.
