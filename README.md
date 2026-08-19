@@ -9,7 +9,7 @@ docker compose up -d
 docker compose ps
 ```
 
-`mongo-init`이 종료되고 `mongo1`, `mongo2`, `mongo3`, `nats1`, `nats2`, `nats3`, `postgres`가 `healthy`이면 초기화가 끝난 상태입니다.
+`mongo-init`이 성공 종료되고 `mongo1`, `mongo2`, `mongo3`, `nats1`, `nats2`, `nats3`, `postgres`가 `healthy`, `nats-box`, `debezium`이 실행 중이면 초기화가 끝난 상태입니다.
 
 ## Gin API controller
 
@@ -54,6 +54,25 @@ nats://nats1:4222,nats://nats2:4222,nats://nats3:4222
 | `nats3` | `4224` | `8224` |
 
 NATS 클러스터 route 포트(`6222`)는 Docker 내부 네트워크에서만 사용합니다.
+
+## Debezium CDC
+
+Debezium Server 3.6은 MongoDB replica set의 Change Stream을 읽어 NATS JetStream의 `MONGO_CDC` stream으로 발행합니다. 대상 collection은 `app.orders`, `app.migration_markers`이며 subject는 `mongo-cdc.*`입니다.
+
+초기 적재는 향후 bulk migrator가 수행하므로 Debezium은 `snapshot.mode=no_data`로 설정했습니다. 즉, Debezium이 시작된 뒤의 변경분만 CDC로 전송합니다. 재시작 시 이어서 읽을 수 있도록 offset은 `debezium-offsets` volume에 보관합니다.
+
+MongoDB connector의 value는 Debezium envelope JSON이며, `after`와 `before` 필드는 Extended JSON 형식의 문자열입니다. 이후 Go CDC applier는 envelope을 먼저 역직렬화한 다음 해당 문자열을 다시 Extended JSON으로 해석해야 합니다. 생성·수정·삭제 operation은 각각 `op`의 `c`·`u`·`d`로 구분합니다.
+
+`nats-box`는 NATS CLI를 실행하기 위한 상시 도구 컨테이너입니다. 초기화 작업은 수행하지 않습니다. API 테스트 과정에서 필요하면 이 컨테이너로 JetStream 상태를 확인하거나 `MONGO_CDC` stream을 직접 생성합니다. stream 정의는 file storage, 3 replicas, 최대 40 GiB, 72시간 보관 정책이며 [nats/streams/mongo-cdc.json](/home/srjung/debezium-test/nats/streams/mongo-cdc.json)에 있습니다.
+
+상태와 수신 메시지는 다음처럼 확인합니다.
+
+```bash
+docker compose exec nats-box nats --server nats://nats1:4222 server report jetstream
+docker compose exec nats-box nats --server nats://nats1:4222 stream add --config /config/mongo-cdc.json
+docker compose logs -f debezium
+docker compose exec nats-box nats --server nats://nats1:4222 stream info MONGO_CDC
+```
 
 노드별 NATS 설정은 [nats/nats1.conf](/home/srjung/debezium-test/nats/nats1.conf), [nats/nats2.conf](/home/srjung/debezium-test/nats/nats2.conf), [nats/nats3.conf](/home/srjung/debezium-test/nats/nats3.conf)에 두었고, 각 컨테이너에 읽기 전용으로 mount합니다.
 

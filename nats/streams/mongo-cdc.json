@@ -1,0 +1,19 @@
+{
+  "name": "MONGO_CDC",
+  "subjects": [
+    "mongo-cdc",
+    "mongo-cdc.>",
+    "__debezium-heartbeat.>"
+  ],
+  "retention": "limits",
+  "max_consumers": -1,
+  "max_msgs": -1,
+  "max_bytes": 42949672960,
+  "max_age": 259200000000000,
+  "max_msgs_per_subject": -1,
+  "max_msg_size": -1,
+  "storage": "file",
+  "num_replicas": 3,
+  "discard": "old",
+  "duplicate_window": 120000000000
+}

@@ -139,6 +139,37 @@ services:
       retries: 20
       start_period: 5s
 
+  nats-box:
+    image: natsio/nats-box:0.18.0
+    container_name: nats-box
+    depends_on:
+      nats1:
+        condition: service_healthy
+      nats2:
+        condition: service_healthy
+      nats3:
+        condition: service_healthy
+    volumes:
+      - ./nats/streams/mongo-cdc.json:/config/mongo-cdc.json:ro
+    networks:
+      - cdc
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["while true; do sleep 3600; done"]
+    restart: unless-stopped
+
+  debezium:
+    image: quay.io/debezium/server:3.6.0.Final
+    container_name: debezium
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./debezium/application.properties:/debezium/config/application.properties:ro
+      - debezium-offsets:/debezium/data
+    networks:
+      - cdc
+    restart: unless-stopped
+
   postgres:
     image: postgres:18-alpine
     container_name: postgres
@@ -184,4 +215,5 @@ volumes:
   nats1-data:
   nats2-data:
   nats3-data:
+  debezium-offsets:
   postgres-data:
